@@ -1088,9 +1088,23 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
+    import time
+    from sqlalchemy.exc import OperationalError
+
     print("Creating tables...")
-    Base.metadata.create_all(bind=engine)
-    print("Tables created.")
+    max_retries = 5
+    for attempt in range(1, max_retries + 1):
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("Tables created.")
+            break
+        except OperationalError as e:
+            if attempt == max_retries:
+                print(f"DB connection failed after {max_retries} attempts, giving up: {e}")
+                raise
+            wait = attempt * 3  # 3s, 6s, 9s, 12s...
+            print(f"DB connection attempt {attempt} failed, retrying in {wait}s...")
+            time.sleep(wait)
 
 @app.get("/")
 def root():
@@ -2018,4 +2032,3 @@ def get_team_messages(
         }
         for m in reversed(messages)
     ]
-
